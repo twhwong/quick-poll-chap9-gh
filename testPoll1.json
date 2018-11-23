@@ -1,0 +1,9 @@
+{
+  "question": "Who will win SuperBowl this year?",
+  "options": [
+    {"value": "New England Patriots"},
+    {"value": "Seattle Seahawks"},
+    {"value": "Green Bay Packers"},
+    {"value": "Denver Broncos"}
+  ]
+}

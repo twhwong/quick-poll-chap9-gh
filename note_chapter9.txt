@@ -1,0 +1,488 @@
+Book
+Spring REST
+Balaji Varanasi
+Sudha Belida
+
+
+-----------------
+Chapter 9 Clients and Testing
+
+- Building clients using RestTemplate
+- Spring Test framework basics
+- Unit testing MVC controllers
+- Integration testing MVC controllers
+
+
+9-11-2018
+
+QuickPoll Java Client
+
+23-11-2018
+Use RestTemplate to build REST clients.
+Add spring-web dependency.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-----------------
+Chapter 8 Security
+
+5-11-2018
+
+After adding HTTP Basic authentication.
+
+Go to this URL with Postman:
+http://localhost:8084/v3/polls
+
+Default username: user
+Spring Boot generated password is at INFO log level.
+Check console.
+
+For example:
+Using generated security password: 89413fe5-7a12-495a-b0c2-3c1ce40cfdbc
+
+cURL can also be used:
+
+curl -vu user:89413fe5-7a12-495a-b0c2-3c1ce40cfdbc http://localhost:8084/v3/polls
+
+--> Create own user class with username, password, Is Admin, etc.
+
+The records in users have password encrytped using the BCrypt
+
+The plain text versions of passwords:
+Note: username starts with small letters, not capital as shown in book.
+
+
+Username Password Is Admin
+
+mickey cheese  No
+minnie red01   No
+donald Quack   No
+daisy quack2   No
+clarabelle Moo No
+admin admin    Yes
+----------------------------
+
+Retrieve user information with interface
+UserDetailsService
+and implement method loadUserByUsername
+
+Put this in the new package security.
+
+UserDetails is an interface.
+
+        // Create a UserDetails object from the data. The o.s.s.c.u. User instance
+        UserDetails userDetails = new org.springframework.security.core.userdetails.
+                User(user.getUsername(), user.getPassword(), authorities);
+
+
+Customize Spring security:
+
+with class WebSecurityConfigurerAdapter
+
+--
+There is still a Spring Boot generated security password!
+Because @Component is forgotten at:
+
+@Component
+public class QuickPollUserDetailsService implements UserDetailsService {
+
+And don't forget these two annotations:
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+---------------------
+
+Use cURL to test (or Postman):
+curl -vu mickey:cheese http://localhost:8084/v3/polls
+
+Note that once the session has been established with the authentication in cURL, then the next GET request does not need
+authentication any more, for example:
+curl http://localhost:8084/v3/polls
+
+
+Next step is to customize that only v3 is secured in the configure method of class SecurityConfig.
+
+
+Last security requirement:
+ensure that users with admin privileges can delete a poll
+
+use
+@EnableGlobalMethodSecurity
+in
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+
+Then annotate method deletePoll in v3 PollController
+with
+@PreAuthorize("hasAuthority('ROLE_ADMIN')")
+
+"hasAuthority('ROLE_ADMIN')" is a Spring-EL expression.
+
+Test in Postman with DELETE action:
+
+http://localhost:8084/v3/polls/12
+
+Enter username and password
+
+
+admin has the righ role and can delete a poll.
+curl -vu admin:admin -X DELETE http://localhost:8084/v3/polls/10
+
+---------------------
+
+OAuth 2.0 Provider implementation
+Open Authorization
+- access protected resources on behalf of a user without storing a password.
+- Four roles:
+ Resource Owner, for example Twitter
+ Client, for example, an app
+ Authorization Server
+ Resource Server, for example Twitter API
+
+
+CALL_BACK_URI parameter:
+After user has logged in successfully on the authentication server (AS), the authentication server redirects the user
+to the client application using the CALL_BACK_URI parameter. The AS also appends an authorization code to it.
+
+Client use this to request an Access Token from the AS.
+
+
+- implicit grant type
+- password grant type ( the user supplies his credentials to the client application directly, similar to XAuth.)
+
+
+----------------
+Add another request mapping so that other authentication (basic) will not break.
+/oauth2/v3/polls
+
+In this example:
+QuickPoll as the Resource Server. An iOS app as a client application.
+
+Implement two components: AS, and a resource server.
+In production scenario, these reside on their own servers for scalability and share a backend database to add
+/retrieve access tokens.
+
+Here they will be implemented here in one application with an in-memory token store.
+
+Create a class OAuth2AuthorizationServerConfig to extend AuthorizationServerConfigurerAdapter and use annotation
+@EnableAuthorizationServer
+
+Authorization server endpoints:
+
+---
+Resource server:
+
+Create a class OAuth2ResourceServerConfig to extend ResourceServerConfigurerAdapter
+and use annotation @EnableResourceServer
+
+--
+How to test how this works?
+
+send this request to the AS:
+
+
+curl -u quickpolliOSClient:top_secret -X POST http://localhost:8084/oauth/token -H "Accept:application/json" -d "username=mickey&password=cheese&grant_type=password"
+
+It does not work. Error:
+{"timestamp":"2018-11-06T15:02:28.311+0000","status":500,"error":"Internal Server Error","message":"There is no PasswordEncoder mapped for the id \"null\"","path":"/oauth/token"}
+
+Solution:
+This must be done:
+Since Spring 5, some new changes has been made.
+
+In class OAuth2AuthorizationServerConfig extends AuthorizationServerConfigurerAdapter
+
+    @Override
+    public void configure(ClientDetailsServiceConfigurer clients) throws Exception {
+
+
+This must be:
+.secret("{noop}top_secret")
+
+Note that this is not secure for production, but for development purpose.
+
+Prefix {} is the new password storage format to the client secret.
+
+Then it works!
+
+The AS will respond with an access token :
+
+{"access_token":"097ee00b-3365-4407-9ed6-3bafc228b088","token_type":"bearer","expires_in":43191,"scope":"read write"}
+
+
+Then use this token to access the protected resource:
+
+curl http://localhost:8084/oauth2/v3/polls -H "Authorization: Bearer 097ee00b-3365-4407-9ed6-3bafc228b088"
+
+Try to delete a poll, this will not work, since user mickey does not have an admin role.
+
+curl -X DELETE http://localhost:8084/oauth2/v3/polls/11 -H "Authorization: Bearer 097ee00b-3365-4407-9ed6-3bafc228b088"
+
+{"error":"access_denied","error_description":"Access is denied"}
+
+--->
+Next, generate a token for the admin user which can delete a poll:
+
+curl -u quickpolliOSClient:top_secret -X POST http://localhost:8084/oauth/token -H "Accept:application/json" -d "username=admin&password=admin&grant_type=password"
+
+{"access_token":"b6409a4a-cf91-4400-8bd5-81ba0601e1a8","token_type":"bearer","expires_in":43199,"scope":"read write"}
+
+Try to delete a poll with the admin user and this token:
+curl -X DELETE http://localhost:8084/oauth2/v3/polls/11 -H "Authorization: Bearer b6409a4a-cf91-4400-8bd5-81ba0601e1a8"
+
+Yes, poll with id 11 has been deleted.
+
+Last test: test if the basic authentication is still working:
+curl -u mickey:cheese http://localhost:8084/v3/polls
+
+Yes, it works.
+
+
+Chapter 8 about Security
+Done (09-11-2018)
+
+
+---------------------
+---------------------
+
+Chapter 7 Versioning, Paging and Sorting
+-----------------
+
+- Strategies for versioning REST services
+
+- Adding pagination capabilities
+
+- Adding sorting capabilities
+
+------------------
+
+- Strategies for versioning REST services
+
+
+
+- URI versioning
+
+LinkedIn, Yahoo, SalesForce, Twitter, Twillio use this.
+
+Pro:
+popular,
+simplifies testing and API development
+
+
+Con:
+client has to do a mass database update to upgrade references to new version
+
+
+
+- URI parameter versioning
+
+Not so popular
+Netflix uses this.
+
+Pro: similar to URI versioning
+
+
+Con:
+client has to do a mass database update to upgrade references to new version
+Some proxies don't cache resources with URI parameters, resulting in additional network traffic
+
+
+- Accept header versioning
+
+Needs creating a custom media type
+vnd.product_name.version+ suffix
+
+More and more popular.
+Github uses this.
+
+Pro:
+allows fine-grained versioning of individual resources without impacting the entire API.
+
+Con:
+make browser testing harder
+
+
+
+
+- Custom header versioning
+
+Similar to Accept header versioning.
+Custom header is used, for example Microsoft Azure uses this custom header:
+x-ms-version: 2014-02-14
+
+
+Same pro and con as Accept header versioning
+
+Pro:
+
+
+Con:
+
+----------------------------------
+
+Two approaches:
+
+- Complete code replication
+
+
+- Version specific code replication
+
+
+
+----------------------------------
+
+Pagination
+
+Different styles:
+
+- page number pagination
+A page size can also be passed to override the default page size
+
+http://blog.example.com/posts?page=3&size=20
+
+
+- limit offset pagination
+Offset means the starting point for the return data.
+
+http://blog.example.com/posts?limit=10&offset=30
+
+- cursor-based pagination
+it is a kind of pointer or a cursor to navigate throught the data set.
+Two reference values: prev, next
+
+by Twitter, Facebook to deal with real-time datasets. Cursors are used for short-term pagination purposes.
+
+- time-based pagination
+Facebook
+
+limit=25&until=1364587774
+limit=25&since=1364587754
+
+until specifies the end of the time range.
+since specifies the beginning of the time range.
+It is a Unix timestamp.
+
+
+23-10-2018
+Use import.sql in resources folder to load dummy poll data.
+
+
+26-10-2018
+Spring data paging and sorting repository
+
+
+In Postman: get two poll instances, and first page is page 0.
+http://localhost:8084/v2/polls?page=0&size=2
+
+Changing Default Page Size
+
+class PageableHandlerMethodArgumentResolver sets the default page size to 20.
+
+How to change this default globally?
+Create and register a new instance of this class with the settings of your choice.
+Create a new class to extend WebMvcConfiguerAdapter class in package com.apress.
+
+But WebMvcConfigurerAdapter is deprecated since Spring 5. Use interface WebMvcConfigurer.
+PageRequest is also deprecated. Use static method of from PageRequest.
+Statement super.addArgumentResolvers is not needed, since it is an interface.
+
+
+Sorting:
+No explicit implementation for sorting. It is done by PagingAndSortingRepository.
+
+For example:
+http://localhost:8084/v2/polls/?sort=question
+
+http://localhost:8084/v2/polls/?sort=question,desc
+
+http://localhost:8084/v2/polls/?page=0&size=20&sort=question,asc&sort=id,desc
+
+Another way to indicate the direction:
+http://localhost:8084/v2/polls/?page=0&size=10&sortByAsc=question
+http://localhost:8084/v2/polls/?page=0&size=10&sortByDesc=question
+
+sortByDesc and sortByAsc don't work!
+
+And this also does not work. Page 117 of the book, use minus sign to indicate descending direction
+http://localhost:8084/v2/polls/?sort=-question
+
+Chapter 7 Done.
+
+-----------------
+
+
+
+-----------------
+Swagger URI:
+
+The generated documentation of the API
+http://localhost:8084/v2/api-docs
+
+
+All the tests with post, get, etc can be done in this web UI interface as well.
+URL remains the same after adding versioning.
+http://localhost:8084/swagger-ui.html
+
+
+
+
+-----------------
+General instructions to test the application manually
+
+Use Postman to post a poll
+
+Post JSON test message testPoll1.json:
+http://localhost:8084/polls
+
+
+With URI versioning:
+http://localhost:8084/v1/polls
+
+
+
+Get all the polls in the browser or Postman:
+http://localhost:8084/polls
+
+
+To post a vote to the poll with id 1, use testVote1.json test message:
+http://localhost:8084/polls/1/votes
+
+
+Get all the votes of a poll with id 1 in Postman:
+http://localhost:8084/polls/1/votes
+
+
+To compute the result of a poll with id=1:
+http://localhost:8084/computeresult?pollId=1
+
+
+--------------------
+
+
+
+
+
+
+
+
+
+
+
+
