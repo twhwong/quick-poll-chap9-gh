@@ -21,6 +21,51 @@ QuickPoll Java Client
 Use RestTemplate to build REST clients.
 Add spring-web dependency.
 
+No need to add extra dependency, because there is already version 5.0.7.
+Otherwise Tomcat cannot be started.
+
+        <!-- https://mvnrepository.com/artifact/org.springframework/spring-web -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <version>5.1.1.RELEASE</version>
+        </dependency>
+
+Error with creating a Poll in v1:
+constraint [\"PRIMARY KEY ON PUBLIC.POLL(POLL_ID)\"; SQL statement:\ninsert into poll (question, poll_id) values (?, ?) [23505-197]];
+nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement"
+If you try to insert this JSON and there are already records in the database:
+{
+  "question": "Who will win SuperBowl this year?",
+  "options": [
+    {"value": "New England Patriots"},
+    {"value": "Seattle Seahawks"},
+    {"value": "Green Bay Packers"},
+    {"value": "Denver Broncos"}
+  ]
+}
+
+It is strange that the insert works if the database is empty by renaming the import.sql to for example
+NOTimport.sql. Restart.
+
+Insert the above message with Postman works, then run QuickPollClient to insert a Poll. This also works.
+
+It seems as if the id's cannot be generated if there are pre-inserted records with the import.sql !?
+Note that there are pre-defined id's in the script import.sql.
+
+This does not work:
+@GeneratedValue(strategy = GenerationType.AUTO)
+@GeneratedValue(strategy = GenerationType.SEQUENCE)
+
+No idea how to fix this. So, if you don't use the script import.sql, then creating a Poll with the client works well.
+
+It seems as if Poll and options use the same sequence to generate or get the id!!!
+
+This does not help, before the field Id for Poll or Option
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "poll_id_seq")
+    @SequenceGenerator(name = "poll_id_seq", sequenceName = "HIBERNATE_SEQUENCE", allocationSize = 1)
+
+
 
 
 
