@@ -46,8 +46,25 @@ public class QuickPollClient {
         restTemplate.put(QUICK_POLL_URI_V1 + "/{pollId}", poll, poll.getId());
     }
 
+    // Delete a Poll
+    public void deletePoll(Long pollId) {
+        restTemplate.delete(QUICK_POLL_URI_V1 + "/{pollId}", pollId);
+    }
+    // Delete all the Polls
+    public void deleteAllPolls() {
+        List<Poll> allPolls = getAllPolls();
+        for (Poll p : allPolls) {
+            System.out.println("Deleting poll id: " + p.getId());
+            restTemplate.delete(QUICK_POLL_URI_V1 + "/{pollId}", p.getId());
+        }
+    }
+
     public static void main(String[] args) {
         QuickPollClient client = new QuickPollClient();
+
+//        System.out.println("---- Delete all Polls first ----");
+//        client.deleteAllPolls();
+
 
         System.out.println("---- Create a Poll ----");
         Poll newPoll = new Poll();
@@ -65,6 +82,7 @@ public class QuickPollClient {
         newPoll.setOptions(options);
         URI pollLocation = client.createPoll(newPoll);
         System.out.println("Newly Created Poll Location " + pollLocation);
+        //System.out.println("Poll id: " + pollLocation.getPath());
 
 
         System.out.println("---- Create a Poll ----");
@@ -83,12 +101,16 @@ public class QuickPollClient {
         newPoll.setOptions(options);
         pollLocation = client.createPoll(newPoll);
         System.out.println("Newly Created Poll Location " + pollLocation);
+        //System.out.println("Poll id: " + pollLocation.getPath());
 
         // get a Poll
-        Poll poll = client.getPollById(1L);
+        // How to get the id of the newly created Poll ?
+        System.out.println("---- Get a Poll with id: " +  " ----");
+        Poll poll = client.getPollById(43L);
         System.out.println(poll);
 
         // get all Polls
+        System.out.println("---- Get all Polls ----");
         List<Poll> allPolls = client.getAllPolls();
         System.out.println(allPolls);
 
@@ -104,7 +126,13 @@ public class QuickPollClient {
         client.updatePoll(poll);
         System.out.println(poll);
 
-
+        // Delete a Poll
+        System.out.println("---- Delete Poll with id " + poll.getId() +" ----");
+        client.deletePoll(poll.getId());
+        for (Poll p : allPolls) {
+            System.out.println(p);
+            System.out.println("--------------------");
+        }
 
     }
 

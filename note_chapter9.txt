@@ -66,6 +66,42 @@ This does not help, before the field Id for Poll or Option
     @SequenceGenerator(name = "poll_id_seq", sequenceName = "HIBERNATE_SEQUENCE", allocationSize = 1)
 
 
+--------------------
+Handling Pagination
+--------------------
+
+Type PageImpl of springframework data domain Page is a concrete implementation of Page interface and can hold all the paging and sorting
+information. The only problem is it does not have a default constructor and Spring's HTTP message converter would fail: Could not read JSON,....
+
+You have to write a Java class that mimics PageImpl class, write PageWrapper class.
+
+Sometimes you have to generate Java types from JSON. See online tool
+http://www.jsonschema2pojo.org
+
+
+
+QuickPollClientV2 does not work:
+Exception in thread "main" org.springframework.http.converter.HttpMessageConversionException: Type definition error:
+[simple type, class org.springframework.data.domain.Sort]; nested exception is com.fasterxml.jackson.databind.exc.InvalidDefinitionException: Cannot construct instance of `org.springframework.data.domain.Sort` (no Creators, like default construct, exist): cannot deserialize from Object value (no delegate- or property-based Creator)
+
+Add constructor to PageWrapper class does not solve this.
+
+Check this:
+https://stackoverflow.com/questions/34099559/how-to-consume-pageentity-response-using-spring-resttemplate/44895867
+
+
+
+
+------------
+25-03-2019
+
+How to run and test the client?
+
+1) Start the application first by running QuickPollApplication
+
+2) Then run the client, for example QuickPollClient, in order to test GET, POST, etc.
+
+
 
 
 
